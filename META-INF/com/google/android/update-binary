@@ -1,0 +1,75 @@
+#!/sbin/sh
+# installer backend
+
+tmp=/tmp/note7-disable-charging-limit
+boot=/dev/block/bootdevice/by-name/BOOT
+
+if [ "$3" ]; then
+	zip=$3
+	console=/proc/$$/fd/$2
+	# write the location of the console buffer to /tmp/console for other scripts to use
+	echo "$console" > /tmp/console
+else
+	console=$(cat /tmp/console)
+	[ "$console" ] || console=/proc/$$/fd/1
+fi
+
+print() {
+	echo "ui_print ${1:- }" > $console
+	echo
+}
+
+abort() {
+	[ "$1" ] && {
+		print "Error: $1"
+		print "Aborting..."
+	}
+	cleanup
+	print "Failed to patch boot image!"
+	exit 1
+}
+
+cleanup() {
+	[ "$zip" ] && rm /tmp/console
+	rm -rf "$tmp"
+}
+
+extract() {
+	rm -rf "$2"
+	mkdir -p "$2"
+	unzip -o "$1" -d "$2"
+}
+
+print "##################################"
+print "# Note 7 Charging Limit Disabler #"
+print "#          version 2.0           #"
+print "# KEEP FIRE EXTINGUISHER NEARBY! #"
+print "##################################"
+
+# Unpack the installer
+[ "$zip" ] && {
+	print "Unpacking the installer..."
+	extract "$zip" "$tmp"
+}
+cd "$tmp" || abort "Could not enter $tmp!"
+
+chmod 0755 bootimg
+
+[ -x bootimg ] || abort "Could not find executable bootimg binary!"
+
+[ -f dtb.img ] || abort "Could not find replacement dtb.img!"
+
+print "Replacing DTB..."
+
+./bootimg uvv "$boot" --dt dtb.img || abort "DTB replacement failed, see recovery.log!"
+
+print "Boot image patching complete"
+
+cleanup
+
+sleep 1
+
+print
+print "Good luck with not burning your house down!"
+print "With plenty of love,"
+print " - jcadduono"
