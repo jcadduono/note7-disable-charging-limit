@@ -31,7 +31,6 @@ abort() {
 
 cleanup() {
 	[ "$zip" ] && rm /tmp/console
-	rm -rf "$tmp"
 }
 
 extract() {
@@ -57,11 +56,29 @@ chmod 0755 bootimg
 
 [ -x bootimg ] || abort "Could not find executable bootimg binary!"
 
-[ -f dtb.img ] || abort "Could not find replacement dtb.img!"
+print "Searching for boot image board magic..."
+
+set -- $(./bootimg v "$boot" --board)
+
+case $2 in
+\"SRPPD15*)
+	dtb="dtb-xx.img"
+	print "Found Note 7 International ($2)"
+	;;
+\"SRPPD26*)
+	dtb="dtb-kor.img"
+	print "Found Note 7 Korea ($2)"
+	;;
+*)
+	abort "Unable to determine device from board magic ($2)!"
+	;;
+esac
 
 print "Replacing DTB..."
 
-./bootimg uvv "$boot" --dt dtb.img || abort "DTB replacement failed, see recovery.log!"
+[ -f "$dtb" ] || abort "Could not find replacement $dtb!"
+
+./bootimg uvv "$boot" --dt "$dtb" || abort "DTB replacement failed, see recovery.log!"
 
 print "Boot image patching complete"
 
